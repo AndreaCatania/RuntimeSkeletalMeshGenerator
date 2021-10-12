@@ -292,7 +292,7 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 					// Mesh. This happens when the user submits surfaces with different
 					// bone weights. Pad it automatically, to simplify the user life.
 					Weight.InfluenceWeights[InfluenceIndex] = 0;
-					Weight.InfluenceBones[InfluenceIndex] = 0;
+					Weight.InfluenceBones[InfluenceIndex] = INDEX_NONE;
 				}
 				else
 				{
@@ -312,7 +312,7 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 					const uint8 EncodedWeight =
 						FMath::Clamp(VertInfluence.Weight, 0.f, 1.f) * 255.f;
 					Weight.InfluenceWeights[InfluenceIndex] = EncodedWeight;
-					Weight.InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? 0 : VertInfluence.BoneIndex;
+					Weight.InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? INDEX_NONE : VertInfluence.BoneIndex;
 				}
 			}
 		}
