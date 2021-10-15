@@ -35,12 +35,10 @@ struct FMeshSurface
 };
 
 /**
- * Generate the `SkeletalMeshComponent` for the given surfaces, and add the
- * component to the `Actor`.
+ * Generate the `SkeletalMesh` for the given surfaces.
  */
-inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
-	AActor* Actor,
-	USkeleton* BaseSkeleton,
+inline void GenerateSkeletalMeshComponent(
+	USkeletalMesh* SkeletalMesh,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial)
 {
@@ -141,11 +139,6 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 
 	// Unreal doesn't support more than `MAX_STATIC_TEXCOORDS`.
 	check(UVCount <= MAX_STATIC_TEXCOORDS);
-
-	// Note: we use nullptr outer to make this transient.
-	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>();
-	SkeletalMesh->RefSkeleton = BaseSkeleton->GetReferenceSkeleton();
-	SkeletalMesh->Skeleton = BaseSkeleton;
 
 	// Populate Arrays step.
 	SkeletalMesh->AllocateResourceForRendering();
@@ -301,7 +294,7 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 					// Make sure these are the same.
 					check(VertexIndex == VertInfluence.VertexIndex);
 
-					if (!BaseSkeleton->GetReferenceSkeleton().IsValidIndex(VertInfluence.BoneIndex))
+					if (!SkeletalMesh->Skeleton->GetReferenceSkeleton().IsValidIndex(VertInfluence.BoneIndex))
 					{
 						// This bone appear to be invalid, continue.
 						UE_LOG(LogTemp, Warning, TEXT("The bone %i isn't found in this skeleton"), VertInfluence.BoneIndex);
@@ -332,7 +325,7 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 		RenderSection.BoneMap.Empty();
 	}
 
-	for (int32 BoneIndex = 0; BoneIndex < BaseSkeleton->GetBoneTree().Num(); BoneIndex++)
+	for (int32 BoneIndex = 0; BoneIndex < SkeletalMesh->Skeleton->GetBoneTree().Num(); BoneIndex++)
 	{
 		SkeletalMeshLODModel->ActiveBoneIndices.Add(BoneIndex);
 		SkeletalMeshLODModel->RequiredBones.Add(BoneIndex);
@@ -378,6 +371,28 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 	// This is to prevent the editor variable changes overwriting the import mesh,
 	// if you don't set this random crashes occur.
 	SkeletalMesh->StackPostEditChange();
+}
+
+/**
+ * Generate the `SkeletalMeshComponent` for the given surfaces, and add the
+ * component to the `Actor`.
+ */
+inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
+	AActor* Actor,
+	USkeleton* BaseSkeleton,
+	const TArray<FMeshSurface>& Surfaces,
+	const TArray<UMaterialInterface*>& SurfacesMaterial)
+{
+	// Note: we do not pass anything so the skeletal mesh is transient and
+	// destroyed when the play session end.
+	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>();
+	SkeletalMesh->RefSkeleton = BaseSkeleton->GetReferenceSkeleton();
+	SkeletalMesh->Skeleton = BaseSkeleton;
+
+	GenerateSkeletalMeshComponent(
+		SkeletalMesh,
+		Surfaces,
+		SurfacesMaterial);
 
 	USkeletalMeshComponent* SkeletalMeshComponent =
 		NewObject<USkeletalMeshComponent>(
