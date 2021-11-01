@@ -12,12 +12,21 @@
 /******************************************************************************/
 #pragma once
 
-#include "MeshUtilities.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshModel.h"
+
+/**
+ * Struct for BoneInfluences.
+ */
+struct FRawBoneInfluence
+{
+	float Weight;
+	int32 VertexIndex;
+	int32 BoneIndex;
+};
 
 /**
  * This structure contains all the mesh surface info.
@@ -31,7 +40,7 @@ struct FMeshSurface
 	TArray<uint32> Indices;
 	TArray<FColor> Colors;
 	TArray<TArray<FVector2D>> Uvs;
-	TArray<TArray<SkeletalMeshImportData::FRawBoneInfluence>> BoneInfluences;
+	TArray<TArray<FRawBoneInfluence>> BoneInfluences;
 };
 
 /**
@@ -157,8 +166,7 @@ inline void GenerateSkeletalMeshComponent(
 	const FBox BoundingBox(Vertices.GetData(), Vertices.Num());
 	SkeletalMesh->SetImportedBounds(FBoxSphereBounds(BoundingBox));
 
-	// NOTE: not the same as the original code - fishy remove if not required.
-	// Seems required to edit in editor.
+#ifdef WITH_EDITOR
 	FSkeletalMeshLODModel* SkeletalMeshLODModel = new FSkeletalMeshLODModel();
 	SkeletalMesh->GetImportedModel()->LODModels.Add(SkeletalMeshLODModel);
 
@@ -166,51 +174,50 @@ inline void GenerateSkeletalMeshComponent(
 	SkeletalMeshLODModel->NumTexCoords = UVCount;
 
 	SkeletalMeshLODModel->Sections.SetNum(Surfaces.Num());
+#endif
+
 	LODMeshRenderData->RenderSections.SetNum(Surfaces.Num());
 
 	for (int32 I = 0; I < Surfaces.Num(); I++)
 	{
 		const FMeshSurface& Surface = Surfaces[I];
-		FSkelMeshSection& MeshSection = SkeletalMeshLODModel->Sections[I];
 		FSkelMeshRenderSection& RenderSection = LODMeshRenderData->RenderSections[I];
 
-		MeshSection.bDisabled = false;
-		MeshSection.BaseVertexIndex = SurfaceVertexOffsets[I];
-		MeshSection.NumVertices = Surface.Vertices.Num();
-		MeshSection.BaseIndex = SurfaceIndexOffsets[I];
-		MeshSection.NumTriangles = Surface.Indices.Num() / 3;
-		MeshSection.MaterialIndex = I;
-		MeshSection.bCastShadow = true;
-		MeshSection.bRecomputeTangent = true;
+		RenderSection.bDisabled = false;
+		RenderSection.BaseVertexIndex = SurfaceVertexOffsets[I];
+		RenderSection.NumVertices = Surface.Vertices.Num();
+		RenderSection.BaseIndex = SurfaceIndexOffsets[I];
+		RenderSection.NumTriangles = Surface.Indices.Num() / 3;
+		RenderSection.MaterialIndex = I;
+		RenderSection.bCastShadow = true;
+		RenderSection.bRecomputeTangent = true;
+		RenderSection.MaxBoneInfluences = MaxBoneInfluences;
+
+#ifdef WITH_EDITOR
+		FSkelMeshSection& MeshSection = SkeletalMeshLODModel->Sections[I];
+		MeshSection.bDisabled = RenderSection.bDisabled;
+		MeshSection.bRecomputeTangent = RenderSection.bRecomputeTangent;
+		MeshSection.bCastShadow = RenderSection.bCastShadow;
+		MeshSection.BaseVertexIndex = RenderSection.BaseVertexIndex;
+		MeshSection.BaseIndex = RenderSection.BaseIndex;
+		MeshSection.MaterialIndex = RenderSection.MaterialIndex;
+		MeshSection.NumVertices = RenderSection.NumVertices;
+		MeshSection.NumTriangles = RenderSection.NumTriangles;
+		MeshSection.MaxBoneInfluences = RenderSection.MaxBoneInfluences;
 		MeshSection.bUse16BitBoneIndex = bUse16BitBoneIndex;
 		MeshSection.OriginalDataSectionIndex = I; // Section IDX for below lookup in user sections data
 		MeshSection.SoftVertices.Empty();
-		MeshSection.MaxBoneInfluences = MaxBoneInfluences;
-
-		RenderSection.bDisabled = MeshSection.bDisabled;
-		RenderSection.bRecomputeTangent = MeshSection.bRecomputeTangent;
-		RenderSection.bCastShadow = MeshSection.bCastShadow;
-		RenderSection.BaseVertexIndex = MeshSection.BaseVertexIndex;
-		RenderSection.BaseIndex = MeshSection.BaseIndex;
-		RenderSection.MaterialIndex = MeshSection.MaterialIndex;
-		RenderSection.NumVertices = MeshSection.NumVertices;
-		RenderSection.NumTriangles = MeshSection.NumTriangles;
-		RenderSection.MaxBoneInfluences = MeshSection.MaxBoneInfluences;
 
 		{
+			// In Editor we want to make sure the data is in sync between
+			// `UserSectionsData` and RenderSections.
 			FSkelMeshSourceSectionUserData& UserSectionData = SkeletalMeshLODModel->UserSectionsData.FindOrAdd(I);
 			UserSectionData.bDisabled = MeshSection.bDisabled;
 			UserSectionData.bCastShadow = MeshSection.bCastShadow;
 			UserSectionData.bRecomputeTangent = MeshSection.bRecomputeTangent;
 			UserSectionData.RecomputeTangentsVertexMaskChannel = MeshSection.RecomputeTangentsVertexMaskChannel;
 			UserSectionData.GenerateUpToLodIndex = MeshSection.GenerateUpToLodIndex;
-		}
 
-#if WITH_EDITOR
-		{
-			// In Editor we want to make sure the data is in sync between
-			// `UserSectionsData` and RenderSections.
-			const FSkelMeshSourceSectionUserData& UserSectionData = SkeletalMeshLODModel->UserSectionsData.FindOrAdd(I);
 			const bool IsRenderDataInSync =
 				UserSectionData.bDisabled == RenderSection.bDisabled &&
 				UserSectionData.bCastShadow == RenderSection.bCastShadow &&
@@ -238,12 +245,14 @@ inline void GenerateSkeletalMeshComponent(
 
 	// Set the Indices.
 	{
+#ifdef WITH_EDITOR
 		SkeletalMeshLODModel->IndexBuffer = Indices;
+#endif
 
 		LODMeshRenderData->MultiSizeIndexContainer.RebuildIndexBuffer(
 			// Dynamically chose the index buffer size.
-			SkeletalMeshLODModel->IndexBuffer.Num() < MAX_uint16 ? sizeof(uint16) : sizeof(uint32),
-			SkeletalMeshLODModel->IndexBuffer);
+			Indices.Num() < MAX_uint16 ? sizeof(uint16) : sizeof(uint32),
+			Indices);
 
 		// Test our data is good and the renderer can access it.
 		TArray<uint32> ActualIndexBuffer;
@@ -274,7 +283,7 @@ inline void GenerateSkeletalMeshComponent(
 
 		for (int32 VertexIndex = 0; VertexIndex < Surface.BoneInfluences.Num(); VertexIndex++)
 		{
-			const TArray<SkeletalMeshImportData::FRawBoneInfluence>& VertInfluences = Surface.BoneInfluences[VertexIndex];
+			const TArray<FRawBoneInfluence>& VertInfluences = Surface.BoneInfluences[VertexIndex];
 			FSkinWeightInfo& Weight = Weights[SurfaceVertexOffsets[I] + VertexIndex];
 
 			for (int InfluenceIndex = 0; InfluenceIndex < MaxBoneInfluences; InfluenceIndex++)
@@ -289,7 +298,7 @@ inline void GenerateSkeletalMeshComponent(
 				}
 				else
 				{
-					const SkeletalMeshImportData::FRawBoneInfluence& VertInfluence = VertInfluences[InfluenceIndex];
+					const FRawBoneInfluence& VertInfluence = VertInfluences[InfluenceIndex];
 
 					// Make sure these are the same.
 					check(VertexIndex == VertInfluence.VertexIndex);
@@ -312,17 +321,21 @@ inline void GenerateSkeletalMeshComponent(
 	}
 
 	// Enables all the Bones of this skeleton, to avoid break the mesh.
+#ifdef WITH_EDITOR
 	SkeletalMeshLODModel->ActiveBoneIndices.Empty();
 	SkeletalMeshLODModel->RequiredBones.Empty();
+#endif
 	LODMeshRenderData->RequiredBones.Empty();
 	LODMeshRenderData->ActiveBoneIndices.Empty();
 
 	for (int32 I = 0; I < Surfaces.Num(); I++)
 	{
-		FSkelMeshSection& MeshSection = SkeletalMeshLODModel->Sections[I];
 		FSkelMeshRenderSection& RenderSection = LODMeshRenderData->RenderSections[I];
-		MeshSection.BoneMap.Empty();
 		RenderSection.BoneMap.Empty();
+#ifdef WITH_EDITOR
+		FSkelMeshSection& MeshSection = SkeletalMeshLODModel->Sections[I];
+		MeshSection.BoneMap.Empty();
+#endif
 	}
 
 	for (int32 BoneIndex = 0; BoneIndex < SkeletalMesh->Skeleton->GetBoneTree().Num(); BoneIndex++)
@@ -334,10 +347,12 @@ inline void GenerateSkeletalMeshComponent(
 
 		for (int32 I = 0; I < Surfaces.Num(); I++)
 		{
-			FSkelMeshSection& MeshSection = SkeletalMeshLODModel->Sections[I];
 			FSkelMeshRenderSection& RenderSection = LODMeshRenderData->RenderSections[I];
-			MeshSection.BoneMap.Add(BoneIndex);
 			RenderSection.BoneMap.Add(BoneIndex);
+#ifdef WITH_EDITOR
+			FSkelMeshSection& MeshSection = SkeletalMeshLODModel->Sections[I];
+			MeshSection.BoneMap.Add(BoneIndex);
+#endif
 		}
 	}
 
