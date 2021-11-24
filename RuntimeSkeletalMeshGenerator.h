@@ -46,7 +46,7 @@ struct FMeshSurface
 /**
  * Generate the `SkeletalMesh` for the given surfaces.
  */
-inline void GenerateSkeletalMeshComponent(
+inline void GenerateSkeletalMesh(
 	USkeletalMesh* SkeletalMesh,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial)
@@ -404,7 +404,7 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 	SkeletalMesh->RefSkeleton = BaseSkeleton->GetReferenceSkeleton();
 	SkeletalMesh->Skeleton = BaseSkeleton;
 
-	GenerateSkeletalMeshComponent(
+	GenerateSkeletalMesh(
 		SkeletalMesh,
 		Surfaces,
 		SurfacesMaterial);
