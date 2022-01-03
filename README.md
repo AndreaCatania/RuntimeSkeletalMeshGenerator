@@ -72,6 +72,12 @@ void YourAmazingFunction()
 }
 ```
 
+## Support
+
+If you need any help, please post a question on the [Discussions page](https://github.com/AndreaCatania/RuntimeSkeletalMeshGenerator/discussions); and if you find a bug please consider to report it on the [Issues page](https://github.com/AndreaCatania/RuntimeSkeletalMeshGenerator/issues)
+
+---
+
 Authors:
 - https://github.com/RevoluPowered
 - https://github.com/AndreaCatania
