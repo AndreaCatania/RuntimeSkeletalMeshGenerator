@@ -10,47 +10,26 @@
 /* correctly populate the UE4 buffers, needed to have a fully working         */
 /* `USkeletalMeshComponent`.                                                  */
 /******************************************************************************/
-#pragma once
+#include "RuntimeSkeletalMeshGenerator.h"
 
-#include "Components/SkeletalMeshComponent.h"
-#include "Rendering/SkeletalMeshLODImporterData.h"
 #include "Rendering/SkeletalMeshLODModel.h"
-#include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshModel.h"
 
-/**
- * Struct for BoneInfluences.
- */
-struct FRawBoneInfluence
+void FRuntimeSkeletalMeshGeneratorModule::StartupModule()
 {
-	float Weight;
-	int32 VertexIndex;
-	int32 BoneIndex;
-};
+}
 
-/**
- * This structure contains all the mesh surface info.
- */
-struct FMeshSurface
+void FRuntimeSkeletalMeshGeneratorModule::ShutdownModule()
 {
-	TArray<FVector> Vertices;
-	TArray<FVector> Tangents;
-	TArray<bool> FlipBinormalSigns;
-	TArray<FVector> Normals;
-	TArray<FColor> Colors;
-	TArray<TArray<FVector2D>> Uvs;
-	TArray<TArray<FRawBoneInfluence>> BoneInfluences;
-	TArray<uint32> Indices;
-};
+}
 
-/**
- * Generate the `SkeletalMesh` for the given surfaces.
- */
-inline void GenerateSkeletalMesh(
+IMPLEMENT_MODULE(FRuntimeSkeletalMeshGeneratorModule, RuntimeSkeletalMeshGenerator)
+
+void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	USkeletalMesh* SkeletalMesh,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial,
-	const TMap<FName, FTransform>& BoneTransformsOverride = TMap<FName, FTransform>())
+	const TMap<FName, FTransform>& BoneTransformsOverride)
 {
 	// Waits the rendering thread has done.
 	FlushRenderingCommands();
@@ -599,16 +578,12 @@ inline void GenerateSkeletalMesh(
 #endif
 }
 
-/**
- * Generate the `SkeletalMeshComponent` for the given surfaces, and add the
- * component to the `Actor`.
- */
-inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
+USkeletalMeshComponent* FRuntimeSkeletalMeshGenerator::GenerateSkeletalMeshComponent(
 	AActor* Actor,
 	USkeleton* BaseSkeleton,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial,
-	const TMap<FName, FTransform>& BoneTransformsOverride = TMap<FName, FTransform>())
+	const TMap<FName, FTransform>& BoneTransformsOverride)
 {
 	// Note: we do not pass anything so the skeletal mesh is transient and
 	// destroyed when the play session end.
@@ -650,16 +625,12 @@ inline USkeletalMeshComponent* GenerateSkeletalMeshComponent(
 	return SkeletalMeshComponent;
 }
 
-/**
- * Update an existing the `SkeletalMeshComponent` for the given surfaces
- * optionally supply the transform override
- */
-inline void UpdateSkeletalMeshComponent(
+void FRuntimeSkeletalMeshGenerator::UpdateSkeletalMeshComponent(
 	USkeletalMeshComponent* SkeletalMeshComponent,
 	USkeleton* BaseSkeleton,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial,
-	const TMap<FName, FTransform>& BoneTransformOverrides = TMap<FName, FTransform>())
+	const TMap<FName, FTransform>& BoneTransformOverrides)
 {
 	// Note: we do not pass anything so the skeletal mesh is transient and
 	// destroyed when the play session end.
@@ -681,8 +652,7 @@ inline void UpdateSkeletalMeshComponent(
 	check(SkeletalMeshComponent->FillComponentSpaceTransformsRequiredBones.Num() != 0);
 }
 
-/// Decompose the `USkeletalMesh` in `Surfaces`.
-inline bool DecomposeSkeletalMesh(
+bool FRuntimeSkeletalMeshGenerator::DecomposeSkeletalMesh(
 	/// The `SkeletalMesh` to decompose
 	const USkeletalMesh* SkeletalMesh,
 	/// Out Surfaces.
