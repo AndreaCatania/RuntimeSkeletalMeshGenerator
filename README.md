@@ -9,11 +9,11 @@ You can just pass all the surfaces' data, this library will take care to correct
 To use this library:
 1. Add this plugin inside the UE4 game plugins folder.
 2. Specify `RuntimeSkeletalMeshGenerator` as plugin on your `Game.uproject`, to enable it.
-3. Import the plugin using `#import "RuntimeSkeletalMeshGenerator/RuntimeSkeletalMeshGenerator.h"`
+3. Import the plugin using `#include "RuntimeSkeletalMeshGenerator/RuntimeSkeletalMeshGenerator.h"`
 
 The plugin is ready to be used, here an example on how to use it:
 ```c++
-#import "RuntimeSkeletalMeshGenerator/RuntimeSkeletalMeshGenerator.h"
+#include "RuntimeSkeletalMeshGenerator/RuntimeSkeletalMeshGenerator.h"
 
 void YourAmazingFunction()
 {
