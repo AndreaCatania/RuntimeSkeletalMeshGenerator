@@ -2,10 +2,12 @@
 
 #include "Animation/Skeleton.h"
 
-FRuntimeSkeletonBoneTransformExtractor::FRuntimeSkeletonBoneTransformExtractor(const USkeleton* InSkeleton, const TMap<FName, FTransform>& PoseOffsets)
+FRuntimeSkeletonBoneTransformExtractor::FRuntimeSkeletonBoneTransformExtractor(
+	const FReferenceSkeleton& InRefSkeleton,
+	const TMap<FName, FTransform>& PoseOffsets)
+	: RefSkeleton(InRefSkeleton)
 {
-	Skeleton = InSkeleton;
-	const TArray<FTransform>& BoneTransforms = Skeleton->GetReferenceSkeleton().GetRawRefBonePose();
+	const TArray<FTransform>& BoneTransforms = InRefSkeleton.GetRawRefBonePose();
 
 	GlobalBoneTransforms.Init(FMatrix::Identity, BoneTransforms.Num());
 
@@ -20,7 +22,7 @@ FRuntimeSkeletonBoneTransformExtractor::FRuntimeSkeletonBoneTransformExtractor(c
 			PoseOffsets,
 			GlobalBoneTransforms,
 			HasGlobalTransform,
-			Skeleton);
+			InRefSkeleton);
 	}
 }
 
@@ -33,14 +35,14 @@ const FMatrix& FRuntimeSkeletonBoneTransformExtractor::GetGlobalTransform(const 
 /// Slower version of `GetGlobalTransform()` that fetches bone by Name.
 FMatrix FRuntimeSkeletonBoneTransformExtractor::GetGlobalTransform(const FName BoneName) const
 {
-	const int32 BoneIndex = Skeleton->GetReferenceSkeleton().FindBoneIndex(BoneName);
+	const int32 BoneIndex = RefSkeleton.FindBoneIndex(BoneName);
 	if (BoneIndex == INDEX_NONE)
 	{
 		return FMatrix::Identity;
 	}
 	else
 	{
-		return GetGlobalTransform(Skeleton->GetReferenceSkeleton().FindBoneIndex(BoneName));
+		return GetGlobalTransform(RefSkeleton.FindBoneIndex(BoneName));
 	}
 }
 
@@ -49,18 +51,13 @@ uint32 FRuntimeSkeletonBoneTransformExtractor::GetBoneNum() const
 	return GlobalBoneTransforms.Num();
 }
 
-const USkeleton* FRuntimeSkeletonBoneTransformExtractor::GetSkeleton() const
-{
-	return Skeleton;
-}
-
 FMatrix FRuntimeSkeletonBoneTransformExtractor::ComputeGlobalTransform(
 	const int32 BoneIndex,
 	const TArray<FTransform>& LocalTransforms,
 	const TMap<FName, FTransform>& PoseOffsets,
 	TArray<FMatrix>& GlobalTransforms,
 	TArray<bool>& HasGlobalTransform,
-	const USkeleton* Skeleton)
+	const FReferenceSkeleton& InRefSkeleton)
 {
 	if (BoneIndex == INDEX_NONE)
 	{
@@ -72,8 +69,8 @@ FMatrix FRuntimeSkeletonBoneTransformExtractor::ComputeGlobalTransform(
 		return GlobalTransforms[BoneIndex];
 	}
 
-	const FName BoneName = Skeleton->GetReferenceSkeleton().GetBoneName(BoneIndex);
-	const int32 ParentIndex = Skeleton->GetReferenceSkeleton().GetParentIndex(BoneIndex);
+	const FName BoneName = InRefSkeleton.GetBoneName(BoneIndex);
+	const int32 ParentIndex = InRefSkeleton.GetParentIndex(BoneIndex);
 
 	const FMatrix ParentBoneTransform = ComputeGlobalTransform(
 		ParentIndex,
@@ -81,7 +78,7 @@ FMatrix FRuntimeSkeletonBoneTransformExtractor::ComputeGlobalTransform(
 		PoseOffsets,
 		GlobalTransforms,
 		HasGlobalTransform,
-		Skeleton);
+		InRefSkeleton);
 
 	GlobalTransforms[BoneIndex] = LocalTransforms[BoneIndex].ToMatrixWithScale() * ParentBoneTransform;
 

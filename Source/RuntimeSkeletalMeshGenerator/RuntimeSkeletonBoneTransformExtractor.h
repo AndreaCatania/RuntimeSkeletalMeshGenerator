@@ -2,17 +2,19 @@
 
 #include "Math/Transform.h"
 
-class USkeleton;
+struct FReferenceSkeleton;
 
 /// Utility to fetch the bone world transform.
 /// Eventually you can pose the skeleton before extracting the final Bone transform.
 class RUNTIMESKELETALMESHGENERATOR_API FRuntimeSkeletonBoneTransformExtractor
 {
-	const USkeleton* Skeleton = nullptr;
+	const FReferenceSkeleton& RefSkeleton;
 	TArray<FMatrix> GlobalBoneTransforms;
 
 public:
-	FRuntimeSkeletonBoneTransformExtractor(const USkeleton* InSkeleton, const TMap<FName, FTransform>& PoseOffsets);
+	FRuntimeSkeletonBoneTransformExtractor(
+		const FReferenceSkeleton& InRefSkeleton,
+		const TMap<FName, FTransform>& PoseOffsets);
 
 	/// Returns the Bone Transform, fetching it by BoneIndex.
 	const FMatrix& GetGlobalTransform(const int32 BoneIndex) const;
@@ -22,8 +24,6 @@ public:
 
 	uint32 GetBoneNum() const;
 
-	const USkeleton* GetSkeleton() const;
-
 private:
 	static FMatrix ComputeGlobalTransform(
 		const int32 BoneIndex,
@@ -31,5 +31,5 @@ private:
 		const TMap<FName, FTransform>& PoseOffsets,
 		TArray<FMatrix>& GlobalTransforms,
 		TArray<bool>& HasGlobalTransform,
-		const USkeleton* Skeleton);
+		const FReferenceSkeleton& InRefSkeleton);
 };
