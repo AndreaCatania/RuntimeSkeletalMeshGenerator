@@ -740,7 +740,7 @@ bool FRuntimeSkeletalMeshGenerator::DecomposeSkeletalMesh(
 			{
 				Surface.BoneInfluences[i][BoneInfluenceIndex].VertexIndex = i;
 				Surface.BoneInfluences[i][BoneInfluenceIndex].BoneIndex =
-					RenderData.SkinWeightVertexBuffer.GetBoneIndex(VertexIndex, BoneInfluenceIndex);
+					RenderSection.BoneMap[RenderData.SkinWeightVertexBuffer.GetBoneIndex(VertexIndex, BoneInfluenceIndex)];
 				Surface.BoneInfluences[i][BoneInfluenceIndex].Weight =
 					FMath::Clamp(static_cast<float>(RenderData.SkinWeightVertexBuffer.GetBoneWeight(VertexIndex, BoneInfluenceIndex)) / 255.0, 0.0, 1.0);
 			}
