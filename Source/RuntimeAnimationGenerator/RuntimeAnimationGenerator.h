@@ -32,9 +32,9 @@ public:
 	struct RUNTIMEANIMATIONGENERATOR_API FKeyFrame
 	{
 		float Time = 0.0;
-		FVector3f Position = FVector3f::ZeroVector;
-		FQuat4f Rotation = FQuat4f::Identity;
-		FVector3f Scale = FVector3f::OneVector;
+		FVector Position = FVector::ZeroVector;
+		FQuat Rotation = FQuat::Identity;
+		FVector Scale = FVector::OneVector;
 
 		bool operator<(const FKeyFrame& OtherKey) const
 		{
