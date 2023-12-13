@@ -41,6 +41,8 @@ struct RUNTIMESKELETALMESHGENERATOR_API FMeshSurface
 	TArray<TArray<FVector2D>> Uvs;
 	TArray<TArray<FRawBoneInfluence>> BoneInfluences;
 	TArray<uint32> Indices;
+
+	int MaterialIndex;
 };
 
 class FRuntimeSkeletalMeshGeneratorModule : public IModuleInterface
