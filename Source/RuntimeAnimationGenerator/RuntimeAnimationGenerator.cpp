@@ -1,5 +1,5 @@
 /******************************************************************************/
-/* Animation Generator for UE4.27                                             */
+/* Animation Generator for UE5.03                                             */
 /* -------------------------------------------------------------------------- */
 /* License MIT                                                                */
 /* Kindly sponsored by IMVU                                                   */
@@ -14,6 +14,7 @@
 
 #include "AnimSequenceRuntime.h"
 #include "AnimationUtils.h"
+#include "Animation/AnimSequenceBase.h"
 
 void FRuntimeAnimationGeneratorModule::StartupModule()
 {
@@ -25,7 +26,7 @@ void FRuntimeAnimationGeneratorModule::ShutdownModule()
 
 IMPLEMENT_MODULE(FRuntimeAnimationGeneratorModule, RuntimeAnimationGenerator)
 
-void FRuntimeAnimationGenerator::PrepareTracks(USkeleton* Skeleton, FTracks& OutTracks)
+void FRuntimeAnimationGenerator::PrepareTracks(const USkeleton* Skeleton, FTracks& OutTracks)
 {
 	OutTracks.IsReady = false;
 
@@ -63,8 +64,8 @@ void FRuntimeAnimationGenerator::PrepareTracks(USkeleton* Skeleton, FTracks& Out
 	{
 		checkf(Track.KeyFrames.Num() > 0, TEXT("No empty tracks at this point"));
 
-		const bool NeedZeroFrame = Track.KeyFrames[0].Time != 0.0;
-		if (NeedZeroFrame)
+		// NeedZeroFrame
+		if (Track.KeyFrames[0].Time != 0.0)
 		{
 			if (FMath::IsNearlyEqual(Track.KeyFrames[0].Time, 0.0f))
 			{
@@ -105,7 +106,7 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 	// ~~ Initialize the Animation ~~
 	Anim->BoneCompressionSettings = FAnimationUtils::GetDefaultAnimationRecorderBoneCompressionSettings();
 	Anim->SetSkeleton(Skeleton);
-	Anim->SequenceLength = 0.f;
+	Anim->SetSequenceLength(0.f);
 	Anim->SetRawNumberOfFrame(0);
 
 	// ~~ Initialize the Animation tracks ~~
@@ -114,7 +115,7 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 	{
 		// Pass `nullptr` so we can initialize it later.
 		// It's safe to cast to `AnimSequenceRuntime` since it doesn't add any member.
-		TrackIndices.Push(static_cast<AnimSequenceRuntime*>(Anim)->AddNewRawTrackRuntime(Track.BoneName, nullptr, RuntimeAnimationTrackNames));
+		TrackIndices.Push(static_cast<UAnimSequenceRuntime*>(Anim)->AddNewRawTrackRuntime(Track.BoneName, nullptr, RuntimeAnimationTrackNames));
 	}
 #if WITH_EDITOR
 	// ~~ Init notifies ~~
@@ -176,9 +177,9 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 			{
 				// This is the last frame, nothing to interpolate.
 				const FKeyFrame& Frame = Track.KeyFrames[FrameId];
-				AnimTrack.PosKeys[FrameIndex] = Frame.Position;
-				AnimTrack.RotKeys[FrameIndex] = Frame.Rotation;
-				AnimTrack.ScaleKeys[FrameIndex] = Frame.Scale;
+				AnimTrack.PosKeys[FrameIndex] = FVector3f(Frame.Position);
+				AnimTrack.RotKeys[FrameIndex] = FQuat4f(Frame.Rotation);
+				AnimTrack.ScaleKeys[FrameIndex] = FVector3f(Frame.Scale);
 			}
 			else
 			{
@@ -188,16 +189,16 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 				checkf(Frame1.Time < Frame2.Time, TEXT("This is is impossible because the `Prepare` clears all the duplicate key frames."));
 				const float Alpha = FMath::Clamp((Time - Frame1.Time) / (Frame2.Time - Frame1.Time), 0.0f, 1.0f);
 
-				AnimTrack.PosKeys[FrameIndex] = FMath::Lerp(Frame1.Position, Frame2.Position, Alpha);
-				AnimTrack.RotKeys[FrameIndex] = FQuat::Slerp(Frame1.Rotation, Frame2.Rotation, Alpha);
-				AnimTrack.ScaleKeys[FrameIndex] = FMath::Lerp(Frame1.Scale, Frame2.Scale, Alpha);
+				AnimTrack.PosKeys[FrameIndex] = FVector3f(FMath::Lerp(Frame1.Position, Frame2.Position, Alpha));
+				AnimTrack.RotKeys[FrameIndex] = FQuat4f(FQuat::Slerp(Frame1.Rotation, Frame2.Rotation, Alpha));
+				AnimTrack.ScaleKeys[FrameIndex] = FVector3f(FMath::Lerp(Frame1.Scale, Frame2.Scale, Alpha));
 			}
 		}
 	}
 
 	// ~~ Finalize the animation ~~
 	Anim->SetRawNumberOfFrame(NumFrames);
-	Anim->SequenceLength = SequenceDuration;
+	Anim->SetSequenceLength(SequenceDuration);
 #if WITH_EDITOR
 	Anim->PostProcessSequence();
 #endif

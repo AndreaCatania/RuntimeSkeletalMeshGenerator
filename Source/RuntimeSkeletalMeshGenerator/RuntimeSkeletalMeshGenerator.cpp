@@ -1,5 +1,5 @@
 ﻿/******************************************************************************/
-/* SkeletalMeshComponent Generator for UE4.27                                 */
+/* SkeletalMeshComponent Generator for UE5.03                                 */
 /* -------------------------------------------------------------------------- */
 /* License MIT                                                                */
 /* Kindly sponsored by IMVU                                                   */
@@ -11,10 +11,8 @@
 /* `USkeletalMeshComponent`.                                                  */
 /******************************************************************************/
 #include "RuntimeSkeletalMeshGenerator.h"
-
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Rendering/SkeletalMeshModel.h"
-#include <algorithm> 
 
 void FRuntimeSkeletalMeshGeneratorModule::StartupModule()
 {
@@ -148,16 +146,16 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	check(ImportedModelData.PointToRawMap.Num() == Vertices.Num());
 
 
-	for (auto& s : Surfaces)
+	for (const auto& Surface : Surfaces)
 	{
-		//�������ʵĸ�ֵ��һ����ȫ��ȷ����֪������SurfacesMaterialΪ�յ��������Ƿ�������
-		if (s.MaterialIndex >= 0 && s.MaterialIndex < SurfacesMaterial.Num())
+		// The assignment of the material here is not necessarily correct. I wonder if an error will occur if the SurfacesMaterial is empty.
+		if (Surface.MaterialIndex >= 0 && Surface.MaterialIndex < SurfacesMaterial.Num())
 		{
-			if (s.MaterialIndex >= ImportedModelData.Materials.Num())
+			if (Surface.MaterialIndex >= ImportedModelData.Materials.Num())
 			{
-				SkeletalMeshImportData::FMaterial& Mat = ImportedModelData.Materials.AddDefaulted_GetRef();
-				Mat.Material = SurfacesMaterial[s.MaterialIndex];
-				Mat.MaterialImportName = SurfacesMaterial[s.MaterialIndex]->GetFullName();
+				SkeletalMeshImportData::FMaterial& NewMaterial = ImportedModelData.Materials.AddDefaulted_GetRef();
+				NewMaterial.Material = SurfacesMaterial[Surface.MaterialIndex];
+				NewMaterial.MaterialImportName = SurfacesMaterial[Surface.MaterialIndex]->GetFullName();
 			}
 		}
 	}
@@ -212,7 +210,7 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	}
 
 	{
-		const int32 BoneNum = SkeletalMesh->Skeleton->GetReferenceSkeleton().GetRawBoneNum();
+		const int32 BoneNum = SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().GetRawBoneNum();
 		SkeletalMeshImportData::FBone DefaultBone;
 		DefaultBone.Name = FString(TEXT(""));
 		DefaultBone.Flags = 0;
@@ -235,7 +233,7 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 			}
 		}
 
-		// At this point it's sure all the bones are initialized, finish the process
+		// At this point it's certain all the bones are initialized, finish the process
 		// by setting the local transform.
 		for (int32 i = 0; i < BoneNum; i += 1)
 		{
@@ -347,11 +345,11 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 
 			const TArray<FRawBoneInfluence>& VertInfluences = Surface.BoneInfluences[v];
 			
-			memset(MeshSection.SoftVertices[v].InfluenceWeights, 0, sizeof(MeshSection.SoftVertices[v].InfluenceWeights));
-			memset(MeshSection.SoftVertices[v].InfluenceBones, 0, sizeof(MeshSection.SoftVertices[v].InfluenceBones));
+			FMemory::Memset(MeshSection.SoftVertices[v].InfluenceWeights, 0, sizeof(MeshSection.SoftVertices[v].InfluenceWeights));
+			FMemory::Memset(MeshSection.SoftVertices[v].InfluenceBones, 0, sizeof(MeshSection.SoftVertices[v].InfluenceBones));
 
-			int nMax = std::min(VertInfluences.Num(), MAX_TOTAL_INFLUENCES);
-			for (int InfluenceIndex = 0; InfluenceIndex < nMax; InfluenceIndex += 1)
+			int MaxVertInfluencesNum = FMath::Min(VertInfluences.Num(), MAX_TOTAL_INFLUENCES);
+			for (int InfluenceIndex = 0; InfluenceIndex < MaxVertInfluencesNum; InfluenceIndex += 1)
 			{
 				const int32 VertexIndex = SurfaceVertexOffsets[I] + v;
 				const FRawBoneInfluence& VertInfluence = VertInfluences[InfluenceIndex];
@@ -368,7 +366,7 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 		}
 
 		{
-			// In Editor we want to make sure the data is in sync between
+			// In Editor, we want to make sure the data is in sync between
 			// `UserSectionsData` and RenderSections.
 			FSkelMeshSourceSectionUserData& UserSectionData = SkeletalMeshLODModel->UserSectionsData.FindOrAdd(I);
 			UserSectionData.bDisabled = MeshSection.bDisabled;
@@ -437,7 +435,6 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	LODMeshRenderData->SkinWeightVertexBuffer.SetUse16BitBoneIndex(bUse16BitBoneIndex);
 
 	TArray<FSkinWeightInfo> Weights;
-	Weights.Empty();
 	Weights.SetNum(Vertices.Num());
 
 	for (int WeightIdx = 0; WeightIdx < Weights.Num(); WeightIdx++)
@@ -458,7 +455,6 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 			const TArray<FRawBoneInfluence>& VertInfluences = Surface.BoneInfluences[LocalVertexIndex];
 			const int32 VertexIndex = SurfaceVertexOffsets[I] + LocalVertexIndex;
 			FSkinWeightInfo& Weight = Weights[VertexIndex];
-			
 
 			for (int InfluenceIndex = 0; InfluenceIndex < MaxBoneInfluences; InfluenceIndex++)
 			{
@@ -523,7 +519,7 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 #endif
 	}
 
-	const int32 BoneNum = SkeletalMesh->Skeleton->GetReferenceSkeleton().GetNum();
+	const int32 BoneNum = SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().GetRawBoneNum();
 	for (int32 BoneIndex = 0; BoneIndex < BoneNum; BoneIndex++)
 	{
 #if WITH_EDITOR
@@ -560,7 +556,6 @@ void FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	SkeletalMesh->GetRefBasesInvMatrix().Empty();
 	SkeletalMesh->CalculateInvRefMatrices(); 
 	MeshRenderData->bReadyForStreaming = false;
-	
 
 	// Suspected Finalization step
 	if (!GIsEditor)
@@ -755,7 +750,7 @@ bool FRuntimeSkeletalMeshGenerator::DecomposeSkeletalMesh(
 				Surface.Colors[i] = RenderData.StaticVertexBuffers.ColorVertexBuffer.VertexColor(VertexIndex);
 			}
 
-			checkf(int32(RenderData.SkinWeightVertexBuffer.GetMaxBoneInfluences()) >= RenderSection.MaxBoneInfluences, TEXT("These two MUST be the same."));
+			checkf(static_cast<int32>(RenderData.SkinWeightVertexBuffer.GetMaxBoneInfluences()) >= RenderSection.MaxBoneInfluences, TEXT("These two MUST be the same."));
 
 			Surface.BoneInfluences[i].SetNum(RenderSection.MaxBoneInfluences);
 			for (

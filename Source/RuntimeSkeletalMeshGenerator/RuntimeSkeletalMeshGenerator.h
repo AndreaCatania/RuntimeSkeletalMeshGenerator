@@ -1,5 +1,5 @@
 /******************************************************************************/
-/* SkeletalMeshComponent Generator for UE4.27                                 */
+/* SkeletalMeshComponent Generator for UE5.03                                 */
 /* -------------------------------------------------------------------------- */
 /* License MIT                                                                */
 /* Kindly sponsored by IMVU                                                   */
@@ -33,6 +33,7 @@ struct RUNTIMESKELETALMESHGENERATOR_API FRawBoneInfluence
  */
 struct RUNTIMESKELETALMESHGENERATOR_API FMeshSurface
 {
+	int32 MaterialIndex;
 	TArray<FVector> Vertices;
 	TArray<FVector> Tangents;
 	TArray<bool> FlipBinormalSigns;
@@ -41,8 +42,6 @@ struct RUNTIMESKELETALMESHGENERATOR_API FMeshSurface
 	TArray<TArray<FVector2D>> Uvs;
 	TArray<TArray<FRawBoneInfluence>> BoneInfluences;
 	TArray<uint32> Indices;
-
-	int MaterialIndex;
 };
 
 class FRuntimeSkeletalMeshGeneratorModule : public IModuleInterface
