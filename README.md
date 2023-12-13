@@ -1,13 +1,18 @@
 # Runtime Skeletal Mesh Generator for UE5
-Helper to create a SkeletalMeshComponent in UE5 at runtime.
+Helper to create a SkeletalMeshComponent in UE4/5 at runtime.
 
-This is a UE4 plugin that simplify the process of creating a `USkeletalMeshComponent`, with many surfaces, at runtime.
-You can just pass all the surfaces' data, this library will take care to correctly populate the UE5 buffers, needed to have a fully working `USkeletalMeshComponent`.
+This is a UE4/5 plugin that simplify the process of creating a `USkeletalMeshComponent`, with many surfaces, at runtime.
+You can just pass all the surfaces' data, this library will take care to correctly populate the UE4/5 buffers, needed to have a fully working `USkeletalMeshComponent`.
+
+## This Fork fixes 5 major bugs in this plugin
+
+The original version of the plugin has an issue that causes it to completely trash the model being loaded into UE4/5, this bug is fixed here.
+And a second issue that cause animations to fail, this bug is fixed here.
 
 ## How to use it
 
 To use this library:
-1. Add this plugin inside the UE5 game plugins folder.
+1. Add this plugin inside the UE4/5 game plugins folder.
 2. Specify `RuntimeSkeletalMeshGenerator` as plugin on your `Game.uproject`, to enable it.
 3. Import the plugin using `#include "RuntimeSkeletalMeshGenerator/RuntimeSkeletalMeshGenerator.h"`
 
@@ -74,6 +79,8 @@ void YourAmazingFunction()
 
 ## Support
 
+See a sample on how to use it to create a procedural skeletal mesh and bones here: https://github.com/Fransferdy/creaturecreator/tree/main
+
 If you need any help, please post a question on the [Discussions page](https://github.com/AndreaCatania/RuntimeSkeletalMeshGenerator/discussions); and if you find a bug please consider to report it on the [Issues page](https://github.com/AndreaCatania/RuntimeSkeletalMeshGenerator/issues)
 
 ---
@@ -81,6 +88,8 @@ If you need any help, please post a question on the [Discussions page](https://g
 Authors:
 - https://github.com/RevoluPowered
 - https://github.com/AndreaCatania
+- https://github.com/Fransferdy
+- https://github.com/dragonpoint
 - https://github.com/AiMiDi
 
 License MIT

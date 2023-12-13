@@ -177,9 +177,9 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 			{
 				// This is the last frame, nothing to interpolate.
 				const FKeyFrame& Frame = Track.KeyFrames[FrameId];
-				AnimTrack.PosKeys[FrameIndex] = Frame.Position;
-				AnimTrack.RotKeys[FrameIndex] = Frame.Rotation;
-				AnimTrack.ScaleKeys[FrameIndex] = Frame.Scale;
+				AnimTrack.PosKeys[FrameIndex] = FVector3f(Frame.Position);
+				AnimTrack.RotKeys[FrameIndex] = FQuat4f(Frame.Rotation);
+				AnimTrack.ScaleKeys[FrameIndex] = FVector3f(Frame.Scale);
 			}
 			else
 			{
@@ -189,9 +189,9 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 				checkf(Frame1.Time < Frame2.Time, TEXT("This is is impossible because the `Prepare` clears all the duplicate key frames."));
 				const float Alpha = FMath::Clamp((Time - Frame1.Time) / (Frame2.Time - Frame1.Time), 0.0f, 1.0f);
 
-				AnimTrack.PosKeys[FrameIndex] = FMath::Lerp(Frame1.Position, Frame2.Position, Alpha);
-				AnimTrack.RotKeys[FrameIndex] = FQuat4f::Slerp(Frame1.Rotation, Frame2.Rotation, Alpha);
-				AnimTrack.ScaleKeys[FrameIndex] = FMath::Lerp(Frame1.Scale, Frame2.Scale, Alpha);
+				AnimTrack.PosKeys[FrameIndex] = FVector3f(FMath::Lerp(Frame1.Position, Frame2.Position, Alpha));
+				AnimTrack.RotKeys[FrameIndex] = FQuat4f(FQuat::Slerp(Frame1.Rotation, Frame2.Rotation, Alpha));
+				AnimTrack.ScaleKeys[FrameIndex] = FVector3f(FMath::Lerp(Frame1.Scale, Frame2.Scale, Alpha));
 			}
 		}
 	}

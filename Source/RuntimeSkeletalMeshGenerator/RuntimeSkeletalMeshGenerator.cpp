@@ -11,7 +11,6 @@
 /* `USkeletalMeshComponent`.                                                  */
 /******************************************************************************/
 #include "RuntimeSkeletalMeshGenerator.h"
-
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Rendering/SkeletalMeshModel.h"
 
@@ -84,7 +83,20 @@ void FRuntimeSkeletalMeshGenerator::FillBufferWithMeshSurface(
 		{
 			if (Surface.Colors.Num() > 0)
 			{
-				StaticVertices[VerticesOffset + VertexIndex].Color = Surface.Colors[VertexIndex];
+				if (Surface.Colors.Num() > 0)
+				{
+					StaticVertices[VerticesOffset + VertexIndex].Color = Surface.Colors[VertexIndex];
+				}
+				StaticVertices[VerticesOffset + VertexIndex].Position = FVector3f(Surface.Vertices[VertexIndex]);
+				StaticVertices[VerticesOffset + VertexIndex].TangentX = FVector3f(Surface.Tangents[VertexIndex]);
+				StaticVertices[VerticesOffset + VertexIndex].TangentY = FVector3f(FVector::CrossProduct(Surface.Normals[VertexIndex], Surface.Tangents[VertexIndex]) * (Surface.FlipBinormalSigns[VertexIndex] ? -1.0 : 1.0));
+				StaticVertices[VerticesOffset + VertexIndex].TangentZ = FVector3f(Surface.Normals[VertexIndex]);
+				FMemory::Memcpy(
+					StaticVertices[VerticesOffset + VertexIndex].UVs,
+					Surface.Uvs[VertexIndex].GetData(),
+					sizeof(FVector2D) * UVCount);
+
+				VertexSurfaceIndex[VerticesOffset + VertexIndex] = I;
 			}
 			StaticVertices[VerticesOffset + VertexIndex].Position = Surface.Vertices[VertexIndex];
 			StaticVertices[VerticesOffset + VertexIndex].TangentX = Surface.Tangents[VertexIndex];
@@ -149,7 +161,8 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 
 #if WITH_EDITORONLY_DATA
 	// Initialize the `ImportModel` this is used by the editor during reload time.
-	ImportedModelData.Points = Vertices;
+	ImportedModelData.Points.Empty();
+	ImportedModelData.Points.Append(Vertices);
 
 	// Existing points map 1:1
 	ImportedModelData.PointToRawMap.AddUninitialized(ImportedModelData.Points.Num());
@@ -159,12 +172,21 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	}
 	check(ImportedModelData.PointToRawMap.Num() == Vertices.Num());
 
-	for (int32 I = 0; I < Surfaces.Num(); I++)
+
+	for (const auto& Surface : Surfaces)
 	{
-		SkeletalMeshImportData::FMaterial& Mat = ImportedModelData.Materials.AddDefaulted_GetRef();
-		Mat.Material = SurfacesMaterial[I];
-		Mat.MaterialImportName = SurfacesMaterial[I]->GetFullName();
+		// The assignment of the material here is not necessarily correct. I wonder if an error will occur if the SurfacesMaterial is empty.
+		if (Surface.MaterialIndex >= 0 && Surface.MaterialIndex < SurfacesMaterial.Num())
+		{
+			if (Surface.MaterialIndex >= ImportedModelData.Materials.Num())
+			{
+				SkeletalMeshImportData::FMaterial& NewMaterial = ImportedModelData.Materials.AddDefaulted_GetRef();
+				NewMaterial.Material = SurfacesMaterial[Surface.MaterialIndex];
+				NewMaterial.MaterialImportName = SurfacesMaterial[Surface.MaterialIndex]->GetFullName();
+			}
+		}
 	}
+
 
 	ImportedModelData.Faces.SetNum(Indices.Num() / 3);
 	for (int32 FaceIndex = 0; FaceIndex < ImportedModelData.Faces.Num(); FaceIndex += 1)
@@ -215,7 +237,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	}
 
 	{
-		const int32 BoneNum = SkeletalMesh->Skeleton->GetReferenceSkeleton().GetRawBoneNum();
+		const int32 BoneNum = SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().GetRawBoneNum();
 		SkeletalMeshImportData::FBone DefaultBone;
 		DefaultBone.Name = FString(TEXT(""));
 		DefaultBone.Flags = 0;
@@ -229,8 +251,8 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 		ImportedModelData.RefBonesBinary.Init(DefaultBone, BoneNum);
 		for (int32 i = 0; i < BoneNum; i += 1)
 		{
-			ImportedModelData.RefBonesBinary[i].Name = SkeletalMesh->Skeleton->GetReferenceSkeleton().GetBoneName(i).ToString();
-			ImportedModelData.RefBonesBinary[i].ParentIndex = SkeletalMesh->Skeleton->GetReferenceSkeleton().GetParentIndex(i);
+			ImportedModelData.RefBonesBinary[i].Name = SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().GetBoneName(i).ToString();
+			ImportedModelData.RefBonesBinary[i].ParentIndex = SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().GetParentIndex(i);
 			if (ImportedModelData.RefBonesBinary[i].ParentIndex != INDEX_NONE)
 			{
 				// Increase parent children count by 1
@@ -243,14 +265,15 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 		for (int32 i = 0; i < BoneNum; i += 1)
 		{
 			// Relative to its parent.
-			const FTransform* TransformOverride = BoneTransformsOverride.Find(SkeletalMesh->Skeleton->GetReferenceSkeleton().GetBoneName(i));
+			const FTransform* TransformOverride = BoneTransformsOverride.Find(SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().GetBoneName(i));
 			if (TransformOverride != nullptr)
 			{
-				ImportedModelData.RefBonesBinary[i].BonePos.Transform = *TransformOverride;
+				
+				ImportedModelData.RefBonesBinary[i].BonePos.Transform = FTransform3f(*TransformOverride);
 			}
 			else
 			{
-				ImportedModelData.RefBonesBinary[i].BonePos.Transform = SkeletalMesh->Skeleton->GetReferenceSkeleton().GetRawRefBonePose()[i];
+				ImportedModelData.RefBonesBinary[i].BonePos.Transform = FTransform3f(SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().GetRawRefBonePose()[i]);
 			}
 			// Set the Bone Length.
 			ImportedModelData.RefBonesBinary[i].BonePos.Length = ImportedModelData.RefBonesBinary[i].BonePos.Transform.GetLocation().Size();
@@ -314,7 +337,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 		RenderSection.NumVertices = Surface.Vertices.Num();
 		RenderSection.BaseIndex = SurfaceIndexOffsets[I];
 		RenderSection.NumTriangles = Surface.Indices.Num() / 3;
-		RenderSection.MaterialIndex = I;
+		RenderSection.MaterialIndex = Surfaces[I].MaterialIndex;
 		RenderSection.bCastShadow = true;
 		RenderSection.bRecomputeTangent = false;
 		RenderSection.MaxBoneInfluences = MaxBoneInfluences;
@@ -336,10 +359,10 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 		MeshSection.SoftVertices.SetNum(Surface.Vertices.Num());
 		for (int32 v = 0; v < Surface.Vertices.Num(); v += 1)
 		{
-			MeshSection.SoftVertices[v].Position = Surface.Vertices[v];
-			MeshSection.SoftVertices[v].TangentX = Surface.Tangents[v];
-			MeshSection.SoftVertices[v].TangentY = FVector::CrossProduct(Surface.Normals[v], Surface.Tangents[v]) * (Surface.FlipBinormalSigns[v] ? -1.0 : 1.0);
-			MeshSection.SoftVertices[v].TangentZ = Surface.Normals[v];
+			MeshSection.SoftVertices[v].Position = FVector3f(Surface.Vertices[v]);
+			MeshSection.SoftVertices[v].TangentX = FVector3f(Surface.Tangents[v]);
+			MeshSection.SoftVertices[v].TangentY = FVector3f(FVector::CrossProduct(Surface.Normals[v], Surface.Tangents[v]) * (Surface.FlipBinormalSigns[v] ? -1.0 : 1.0));
+			MeshSection.SoftVertices[v].TangentZ = FVector3f(Surface.Normals[v]);
 			FMemory::Memcpy(
 				MeshSection.SoftVertices[v].UVs,
 				Surface.Uvs[v].GetData(),
@@ -349,27 +372,25 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 				MeshSection.SoftVertices[v].Color = Surface.Colors[v];
 			}
 
-			for (int InfluenceIndex = 0; InfluenceIndex < MAX_TOTAL_INFLUENCES; InfluenceIndex += 1)
-			{
-				const TArray<FRawBoneInfluence>& VertInfluences = Surface.BoneInfluences[v];
-				const int32 VertexIndex = SurfaceVertexOffsets[I] + v;
-				if (VertInfluences.Num() <= InfluenceIndex)
-				{
-					MeshSection.SoftVertices[v].InfluenceWeights[InfluenceIndex] = 0;
-					MeshSection.SoftVertices[v].InfluenceBones[InfluenceIndex] = INDEX_NONE;
-				}
-				else
-				{
-					const FRawBoneInfluence& VertInfluence = VertInfluences[InfluenceIndex];
-					// Make sure these are the same.
-					check(v == VertInfluence.VertexIndex);
+			const TArray<FRawBoneInfluence>& VertInfluences = Surface.BoneInfluences[v];
+			
+			FMemory::Memset(MeshSection.SoftVertices[v].InfluenceWeights, 0, sizeof(MeshSection.SoftVertices[v].InfluenceWeights));
+			FMemory::Memset(MeshSection.SoftVertices[v].InfluenceBones, 0, sizeof(MeshSection.SoftVertices[v].InfluenceBones));
 
-					// Convert 0.0 - 1.0 range to 0 - 255
-					const uint8 EncodedWeight =
-						FMath::Clamp(VertInfluence.Weight, 0.f, 1.f) * 255.f;
-					MeshSection.SoftVertices[v].InfluenceWeights[InfluenceIndex] = EncodedWeight;
-					MeshSection.SoftVertices[v].InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? INDEX_NONE : VertInfluence.BoneIndex;
-				}
+			int MaxVertInfluencesNum = FMath::Min(VertInfluences.Num(), MAX_TOTAL_INFLUENCES);
+			for (int InfluenceIndex = 0; InfluenceIndex < MaxVertInfluencesNum; InfluenceIndex += 1)
+			{
+				const int32 VertexIndex = SurfaceVertexOffsets[I] + v;
+				const FRawBoneInfluence& VertInfluence = VertInfluences[InfluenceIndex];
+				// Make sure these are the same.
+				check(v == VertInfluence.VertexIndex);
+
+				// Convert 0.0 - 1.0 range to 0 - 255
+				const uint8 EncodedWeight =
+					FMath::Clamp(VertInfluence.Weight, 0.f, 1.f) * 255.f;
+
+				MeshSection.SoftVertices[v].InfluenceWeights[InfluenceIndex] = EncodedWeight;
+				MeshSection.SoftVertices[v].InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? 0 : VertInfluence.BoneIndex;
 			}
 		}
 
@@ -445,6 +466,15 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	TArray<FSkinWeightInfo> Weights;
 	Weights.SetNum(Vertices.Num());
 
+	for (int WeightIdx = 0; WeightIdx < Weights.Num(); WeightIdx++)
+	{
+		for (int InfluenceIdx = 0; InfluenceIdx < MAX_TOTAL_INFLUENCES; ++InfluenceIdx)
+		{
+			Weights[WeightIdx].InfluenceBones[InfluenceIdx] = INDEX_NONE;
+			Weights[WeightIdx].InfluenceWeights[InfluenceIdx] = 0;
+		}
+	}
+
 	for (int32 I = 0; I < Surfaces.Num(); I++)
 	{
 		const FMeshSurface& Surface = Surfaces[I];
@@ -494,7 +524,9 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 					}
 #endif
 				}
+				
 			}
+			
 		}
 	}
 
@@ -551,7 +583,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	SkeletalMesh->SkelMirrorAxis = EAxis::Type::None;
 	SkeletalMesh->SkelMirrorFlipAxis = EAxis::Type::None;
 	SkeletalMesh->GetRefBasesInvMatrix().Empty();
-	SkeletalMesh->CalculateInvRefMatrices();
+	SkeletalMesh->CalculateInvRefMatrices(); 
 	MeshRenderData->bReadyForStreaming = false;
 
 	// Suspected Finalization step
@@ -561,17 +593,17 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	}
 
 #if WITH_EDITOR
-	if (SkeletalMesh->LODSettings != nullptr)
+	if (SkeletalMesh->GetLODSettings() != nullptr)
 	{
 		// update mapping information on the class
-		SkeletalMesh->LODSettings->SetLODSettingsFromMesh(SkeletalMesh);
+		SkeletalMesh->GetLODSettings()->SetLODSettingsFromMesh(SkeletalMesh);
 
-		checkf(SkeletalMesh->LODSettings != nullptr, TEXT("At this point the LODSetings are supposed to be set."));
+		checkf(SkeletalMesh->GetLODSettings() != nullptr, TEXT("At this point the LODSetings are supposed to be set."));
 
-		const int32 NumSettings = FMath::Min(SkeletalMesh->LODSettings->GetNumberOfSettings(), SkeletalMesh->GetLODNum());
+		const int32 NumSettings = FMath::Min(SkeletalMesh->GetLODSettings()->GetNumberOfSettings(), SkeletalMesh->GetLODNum());
 		checkf(LODIndex < NumSettings, TEXT("Make sure the LODSettings are set for the LODIndex 0."));
 
-		const FSkeletalMeshLODGroupSettings* SkeletalMeshLODGroupSettings = &SkeletalMesh->LODSettings->GetSettingsForLODLevel(LODIndex);
+		const FSkeletalMeshLODGroupSettings* SkeletalMeshLODGroupSettings = &SkeletalMesh->GetLODSettings()->GetSettingsForLODLevel(LODIndex);
 		MeshLodInfo.BuildGUID = MeshLodInfo.ComputeDeriveDataCacheKey(SkeletalMeshLODGroupSettings);
 	}
 
@@ -607,6 +639,7 @@ USkeletalMeshComponent* FRuntimeSkeletalMeshGenerator::GenerateSkeletalMeshCompo
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>();
 	SkeletalMesh->SetRefSkeleton(BaseSkeleton->GetReferenceSkeleton());
 	SkeletalMesh->SetSkeleton(BaseSkeleton);
+
 
 	GenerateSkeletalMesh(
 		SkeletalMesh,
@@ -724,13 +757,13 @@ bool FRuntimeSkeletalMeshGenerator::DecomposeSkeletalMesh(
 		{
 			const uint32 VertexIndex = VertexIndexOffset + i;
 
-			Surface.Vertices[i] = RenderData.StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
+			Surface.Vertices[i] = FVector(RenderData.StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex));
 
-			Surface.Normals[i] = RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex);
-			Surface.Tangents[i] = RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex);
+			Surface.Normals[i] = FVector(RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex));
+			Surface.Tangents[i] = FVector(RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentX(VertexIndex));
 			// Check if the Binormal Sign is flipped.
-			const FVector3f& ActualBinormal = RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex);
-			const FVector3f CalculatedBinormal = FVector3f::CrossProduct(Surface.Normals[i], Surface.Tangents[i]);
+			const FVector& ActualBinormal = FVector(RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentY(VertexIndex));
+			const FVector CalculatedBinormal = FVector::CrossProduct(Surface.Normals[i], Surface.Tangents[i]);
 			// If the Binormal points toward different location, the `FlipBinormalSign`
 			// must be `false`. Check how the `VertexTangentY` is computed above.
 			Surface.FlipBinormalSigns[i] = FVector3f::DotProduct(ActualBinormal, CalculatedBinormal) < 0.99;
@@ -738,7 +771,7 @@ bool FRuntimeSkeletalMeshGenerator::DecomposeSkeletalMesh(
 			Surface.Uvs[i].SetNum(RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetNumTexCoords());
 			for (uint32 UVIndex = 0; UVIndex < RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetNumTexCoords(); UVIndex += 1)
 			{
-				Surface.Uvs[i][UVIndex] = RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, UVIndex);
+				Surface.Uvs[i][UVIndex] = FVector2d(RenderData.StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, UVIndex));
 			}
 
 			if (VertexIndex < RenderData.StaticVertexBuffers.ColorVertexBuffer.GetNumVertices())

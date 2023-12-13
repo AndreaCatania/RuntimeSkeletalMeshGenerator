@@ -32,10 +32,9 @@ struct RUNTIMESKELETALMESHGENERATOR_API FRawBoneInfluence
  */
 struct RUNTIMESKELETALMESHGENERATOR_API FMeshSurface
 {
-	TArray<FVector3f> Vertices;
-	TArray<uint32> Indices;
-	TArray<FVector3f> Tangents;
-	TArray<FVector3f> Normals;
+	int32 MaterialIndex;
+	TArray<FVector> Vertices;
+	TArray<FVector> Tangents;
 	TArray<bool> FlipBinormalSigns;
 	TArray<FColor> Colors;
 	TArray<TArray<FVector2f>> Uvs;
