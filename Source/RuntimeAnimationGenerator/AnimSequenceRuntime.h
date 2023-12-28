@@ -1,5 +1,5 @@
 ﻿/******************************************************************************/
-/* Animation Generator for UE4.27                                             */
+/* Animation Generator for UE5.03                                             */
 /* -------------------------------------------------------------------------- */
 /* License MIT                                                                */
 /* Kindly sponsored by IMVU                                                   */
@@ -20,7 +20,7 @@
 /// way to add some functionality to it, is to cast the `UAnimSequence` to this
 /// class, to expose and add functionalities to `UAnimSequence`.
 /// Please, make sure to never add any member to this class or dragons will summon.
-class AnimSequenceRuntime : public UAnimSequence
+class UAnimSequenceRuntime final : public UAnimSequence
 {
 public:
 	/// This is the runtime version of `AddNewRawTrack`.
