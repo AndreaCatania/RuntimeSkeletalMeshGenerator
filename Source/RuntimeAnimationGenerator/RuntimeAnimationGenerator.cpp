@@ -24,9 +24,18 @@ void FRuntimeAnimationGeneratorModule::ShutdownModule()
 {
 }
 
+FRuntimeAnimationGenerator::FKeyFrame::FKeyFrame(const double Time, const FVector& Position, const FQuat& Rotation,
+	const FVector& Scale):
+	Time(Time),
+	Position(Position),
+	Rotation(Rotation),
+	Scale(Scale)
+{
+}
+
 IMPLEMENT_MODULE(FRuntimeAnimationGeneratorModule, RuntimeAnimationGenerator)
 
-void FRuntimeAnimationGenerator::PrepareTracks(const USkeleton* Skeleton, FTracks& OutTracks)
+void FRuntimeAnimationGenerator::PrepareSkeletonTracks(const USkeleton* Skeleton, FTracks& OutTracks)
 {
 	OutTracks.IsReady = false;
 
@@ -83,7 +92,7 @@ void FRuntimeAnimationGenerator::PrepareTracks(const USkeleton* Skeleton, FTrack
 	OutTracks.IsReady = true;
 }
 
-UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const FTracks& TracksContainer, UObject* Outer)
+UAnimSequence* FRuntimeAnimationGenerator::GenerateSkeletonAnimSequence(USkeleton* Skeleton, const FTracks& TracksContainer, UObject* Outer)
 {
 	if (!ensureAlwaysMsgf(TracksContainer.IsReady, TEXT("Please call `PrepareTracks` before this function.")))
 	{
@@ -122,17 +131,17 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 	Anim->InitializeNotifyTrack();
 #endif
 	// ~~ First find the sequence duration and frame interval. ~~
-	float FrameInterval = FLT_MAX;
-	float SequenceDuration = 0.0;
+	double FrameInterval = FLT_MAX;
+	double SequenceDuration = 0.0;
 	for (const FTrack& Track : Tracks)
 	{
-		float PreviousFrameTime = Track.KeyFrames[0].Time;
+		double PreviousFrameTime = Track.KeyFrames[0].Time;
 		for (int32 i = 1; i < Track.KeyFrames.Num(); i += 1)
 		{
 			const FKeyFrame& Frame = Track.KeyFrames[i];
 
 			checkf(PreviousFrameTime < Frame.Time, TEXT("At this point this can't go backward."));
-			const float Delta = Frame.Time - PreviousFrameTime;
+			const double Delta = Frame.Time - PreviousFrameTime;
 			checkf(Delta != 0.0, TEXT("This can't never happen at this point."));
 			FrameInterval = FMath::Min(FrameInterval, Delta);
 			SequenceDuration = FMath::Max(Frame.Time, SequenceDuration);
@@ -161,7 +170,7 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 		uint32 NextFrameId = FrameId + 1 >= static_cast<uint32>(Track.KeyFrames.Num()) ? FrameId : (FrameId + 1);
 		for (uint32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex += 1)
 		{
-			const float Time = FrameInterval * static_cast<float>(FrameIndex);
+			const double Time = FrameInterval * static_cast<double>(FrameIndex);
 
 			if (NextFrameId < static_cast<uint32>(Track.KeyFrames.Num()))
 			{
@@ -187,7 +196,7 @@ UAnimSequence* FRuntimeAnimationGenerator::Generate(USkeleton* Skeleton, const F
 				const FKeyFrame& Frame2 = Track.KeyFrames[NextFrameId];
 
 				checkf(Frame1.Time < Frame2.Time, TEXT("This is is impossible because the `Prepare` clears all the duplicate key frames."));
-				const float Alpha = FMath::Clamp((Time - Frame1.Time) / (Frame2.Time - Frame1.Time), 0.0f, 1.0f);
+				const auto Alpha = FMath::Clamp((Time - Frame1.Time) / (Frame2.Time - Frame1.Time), 0.0, 1.0);
 
 				AnimTrack.PosKeys[FrameIndex] = FVector3f(FMath::Lerp(Frame1.Position, Frame2.Position, Alpha));
 				AnimTrack.RotKeys[FrameIndex] = FQuat4f(FQuat::Slerp(Frame1.Rotation, Frame2.Rotation, Alpha));

@@ -31,10 +31,15 @@ class RUNTIMEANIMATIONGENERATOR_API FRuntimeAnimationGenerator
 public:
 	struct RUNTIMEANIMATIONGENERATOR_API FKeyFrame
 	{
-		float Time = 0.0;
-		FVector Position = FVector::ZeroVector;
-		FQuat Rotation = FQuat::Identity;
-		FVector Scale = FVector::OneVector;
+		double Time;
+		FVector Position;
+		FQuat Rotation;
+		FVector Scale;
+
+		explicit FKeyFrame (const double Time = 0.0,
+		                    const FVector& Position = FVector::ZeroVector,
+		                    const FQuat& Rotation = FQuat::Identity,
+		                    const FVector& Scale = FVector::OneVector);
 
 		bool operator<(const FKeyFrame& OtherKey) const
 		{
@@ -79,9 +84,9 @@ public:
 	};
 
 public:
-	static void PrepareTracks(const USkeleton* Skeleton, FTracks& OutTracks);
+	static void PrepareSkeletonTracks(const USkeleton* Skeleton, FTracks& OutTracks);
 
 	/// Generates a new `AnimSequence` using the passed Tracks.
 	/// Note, it's important to use `PrepareTracks` just before using this function.
-	static UAnimSequence* Generate(USkeleton* Skeleton, const FTracks& Tracks, UObject* Outer = GetTransientPackage());
+	static UAnimSequence* GenerateSkeletonAnimSequence(USkeleton* Skeleton, const FTracks& Tracks, UObject* Outer = GetTransientPackage());
 };
