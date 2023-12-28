@@ -28,6 +28,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	USkeletalMesh* SkeletalMesh,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial,
+	const bool bNeedCPUAccess,
 	const TMap<FName, FTransform>& BoneTransformsOverride)
 {
 	// Waits the rendering thread has done.
@@ -263,16 +264,22 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	SkeletalMesh->AllocateResourceForRendering();
 	FSkeletalMeshRenderData* MeshRenderData = SkeletalMesh->GetResourceForRendering();
 
-	auto LODMeshRenderData = MakeUnique<FSkeletalMeshLODRenderData>();
+	auto LODMeshRenderData = new FSkeletalMeshLODRenderData;
 	if (!LODMeshRenderData)
 		return false;
-	MeshRenderData->LODRenderData.Add(LODMeshRenderData.Release());
+	MeshRenderData->LODRenderData.Add(LODMeshRenderData);
 
 	SkeletalMesh->ResetLODInfo();
 	FSkeletalMeshLODInfo& MeshLodInfo = SkeletalMesh->AddLODInfo();
 	// These are correct unreal defaults.
 	MeshLodInfo.LODHysteresis = 0.02;
 	MeshLodInfo.ScreenSize = 1.0;
+	MeshLodInfo.bAllowCPUAccess = bNeedCPUAccess;
+	if(bNeedCPUAccess)
+	{
+		MeshLodInfo.SkinCacheUsage = ESkinCacheUsage::Disabled;
+		MeshLodInfo.bHasBeenSimplified = true;
+	}
 
 	// Set Bounding boxes
 	const FBox BoundingBox(Vertices.GetData(), Vertices.Num());
@@ -418,18 +425,16 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	}
 
 	// Set the Vertex now.
-	constexpr bool NeedCPUAccess = false;
-
 	LODMeshRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(
 		StaticVertices,
-		NeedCPUAccess);
+		bNeedCPUAccess);
 	LODMeshRenderData->StaticVertexBuffers.ColorVertexBuffer.Init(
 		StaticVertices,
-		NeedCPUAccess);
+		bNeedCPUAccess);
 	LODMeshRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(
 		StaticVertices,
 		UVCount,
-		NeedCPUAccess);
+		bNeedCPUAccess);
 
 	LODMeshRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(MaxBoneInfluences);
 	LODMeshRenderData->SkinWeightVertexBuffer.SetUse16BitBoneIndex(bUse16BitBoneIndex);
@@ -441,19 +446,19 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	{
 		for (int InfluenceIdx = 0; InfluenceIdx < MAX_TOTAL_INFLUENCES; ++InfluenceIdx)
 		{
-			Weights[WeightIdx].InfluenceBones[InfluenceIdx] = INDEX_NONE;
+			Weights[WeightIdx].InfluenceBones[InfluenceIdx] = 0;
 			Weights[WeightIdx].InfluenceWeights[InfluenceIdx] = 0;
 		}
 	}
 
-	for (int32 I = 0; I < Surfaces.Num(); I++)
+	for (int32 SurfacesIndex = 0; SurfacesIndex < Surfaces.Num(); SurfacesIndex++)
 	{
-		const FMeshSurface& Surface = Surfaces[I];
+		const FMeshSurface& Surface = Surfaces[SurfacesIndex];
 
 		for (int32 LocalVertexIndex = 0; LocalVertexIndex < Surface.BoneInfluences.Num(); LocalVertexIndex += 1)
 		{
 			const TArray<FRawBoneInfluence>& VertInfluences = Surface.BoneInfluences[LocalVertexIndex];
-			const int32 VertexIndex = SurfaceVertexOffsets[I] + LocalVertexIndex;
+			const int32 VertexIndex = SurfaceVertexOffsets[SurfacesIndex] + LocalVertexIndex;
 			FSkinWeightInfo& Weight = Weights[VertexIndex];
 
 			for (int InfluenceIndex = 0; InfluenceIndex < MaxBoneInfluences; InfluenceIndex++)
@@ -464,7 +469,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 					// Mesh. This happens when the user submits surfaces with different
 					// bone weights. Pad it automatically, to simplify the user life.
 					Weight.InfluenceWeights[InfluenceIndex] = 0;
-					Weight.InfluenceBones[InfluenceIndex] = INDEX_NONE;
+					Weight.InfluenceBones[InfluenceIndex] = 0;
 				}
 				else
 				{
@@ -483,7 +488,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 					const uint8 EncodedWeight =
 						FMath::Clamp(VertInfluence.Weight, 0.f, 1.f) * 255.f;
 					Weight.InfluenceWeights[InfluenceIndex] = EncodedWeight;
-					Weight.InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? INDEX_NONE : VertInfluence.BoneIndex;
+					Weight.InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? 0 : VertInfluence.BoneIndex;
 
 #if WITH_EDITORONLY_DATA
 					if (Weight.InfluenceBones[InfluenceIndex] != INDEX_NONE)
@@ -541,6 +546,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	}
 
 	// Set the skin weights.
+	LODMeshRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(bNeedCPUAccess);
 	LODMeshRenderData->SkinWeightVertexBuffer = Weights;
 
 	// Set the default Material.
@@ -561,6 +567,10 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	if (!GIsEditor)
 	{
 		SkeletalMesh->NeverStream = false;
+	}
+	if(bNeedCPUAccess)
+	{
+		SkeletalMesh->NeverStream = true;
 	}
 
 #if WITH_EDITOR
@@ -603,6 +613,7 @@ USkeletalMeshComponent* FRuntimeSkeletalMeshGenerator::GenerateSkeletalMeshCompo
 	USkeleton* BaseSkeleton,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial,
+	const bool bNeedCPUAccess,
 	const TMap<FName, FTransform>& BoneTransformsOverride)
 {
 	// Note: we do not pass anything so the skeletal mesh is transient and
@@ -621,6 +632,7 @@ USkeletalMeshComponent* FRuntimeSkeletalMeshGenerator::GenerateSkeletalMeshCompo
 		SkeletalMesh,
 		Surfaces,
 		SurfacesMaterial,
+		bNeedCPUAccess,
 		BoneTransformsOverride))
 	{
 		return nullptr;
@@ -636,6 +648,11 @@ USkeletalMeshComponent* FRuntimeSkeletalMeshGenerator::GenerateSkeletalMeshCompo
 	// We register the skeleton resource (which is not meant to be transient to
 	// the engine).
 	SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
+
+	if (bNeedCPUAccess)
+	{
+		SkeletalMeshComponent->SetCPUSkinningEnabled(true);
+	}
 
 	// We register the components and attach them to the editor
 	// We are adding at runtime so its necessary to manually register to the engine.
@@ -661,6 +678,7 @@ bool FRuntimeSkeletalMeshGenerator::UpdateSkeletalMeshComponent(
 	USkeleton* BaseSkeleton,
 	const TArray<FMeshSurface>& Surfaces,
 	const TArray<UMaterialInterface*>& SurfacesMaterial,
+	const bool bNeedCPUAccess,
 	const TMap<FName, FTransform>& BoneTransformOverrides)
 {
 	// Note: we do not pass anything so the skeletal mesh is transient and
@@ -678,12 +696,18 @@ bool FRuntimeSkeletalMeshGenerator::UpdateSkeletalMeshComponent(
 		SkeletalMesh.Get(),
 		Surfaces,
 		SurfacesMaterial,
+		bNeedCPUAccess,
 		BoneTransformOverrides))
 		return false;
 
 	// We register the skeleton resource (which is not meant to be transient to
 	// the engine).
 	SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
+
+	if (bNeedCPUAccess)
+	{
+		SkeletalMeshComponent->SetCPUSkinningEnabled(true);
+	}
 
 	check(SkeletalMeshComponent->RequiredBones.Num() != 0);
 	check(SkeletalMeshComponent->FillComponentSpaceTransformsRequiredBones.Num() != 0);

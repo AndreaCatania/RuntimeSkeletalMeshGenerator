@@ -23,9 +23,15 @@
  */
 struct RUNTIMESKELETALMESHGENERATOR_API FRawBoneInfluence
 {
-	float Weight;
 	int32 VertexIndex;
 	int32 BoneIndex;
+	float Weight;
+
+	explicit FRawBoneInfluence(const int32 VertexIndex = -1, const int32 BoneIndex = -1, const float Weight = 0.):
+		VertexIndex(VertexIndex),
+		BoneIndex(BoneIndex),
+		Weight(Weight)
+	{}
 };
 
 /**
@@ -34,14 +40,14 @@ struct RUNTIMESKELETALMESHGENERATOR_API FRawBoneInfluence
 struct RUNTIMESKELETALMESHGENERATOR_API FMeshSurface
 {
 	int32 MaterialIndex;
-	TArray<uint32> Indices;
-	TArray<FVector> Vertices;
-	TArray<FVector> Tangents;
-	TArray<FVector> Normals;
-	TArray<TArray<FVector2D>> Uvs;
-	TArray<FColor> Colors;
-	TArray<bool> FlipBinormalSigns;
-	TArray<TArray<FRawBoneInfluence>> BoneInfluences;
+	TArray<uint32> Indices{};
+	TArray<FVector> Vertices{};
+	TArray<FVector> Tangents{};
+	TArray<FVector> Normals{};
+	TArray<TArray<FVector2D>> Uvs{};
+	TArray<FColor> Colors{};
+	TArray<bool> FlipBinormalSigns{};
+	TArray<TArray<FRawBoneInfluence>> BoneInfluences{};
 };
 
 class FRuntimeSkeletalMeshGeneratorModule : public IModuleInterface
@@ -61,6 +67,7 @@ public: // ----------------------------------------------------------------- API
 		USkeletalMesh* SkeletalMesh,
 		const TArray<FMeshSurface>& Surfaces,
 		const TArray<UMaterialInterface*>& SurfacesMaterial,
+		const bool bNeedCPUAccess = false,
 		const TMap<FName, FTransform>& BoneTransformsOverride = TMap<FName, FTransform>());
 
 	/**
@@ -72,6 +79,7 @@ public: // ----------------------------------------------------------------- API
 		USkeleton* BaseSkeleton,
 		const TArray<FMeshSurface>& Surfaces,
 		const TArray<UMaterialInterface*>& SurfacesMaterial,
+		const bool bNeedCPUAccess = false,
 		const TMap<FName, FTransform>& BoneTransformsOverride = TMap<FName, FTransform>());
 
 	/**
@@ -83,6 +91,7 @@ public: // ----------------------------------------------------------------- API
 		USkeleton* BaseSkeleton,
 		const TArray<FMeshSurface>& Surfaces,
 		const TArray<UMaterialInterface*>& SurfacesMaterial,
+		const bool bNeedCPUAccess = false,
 		const TMap<FName, FTransform>& BoneTransformOverrides = TMap<FName, FTransform>());
 
 	/**
