@@ -4,10 +4,26 @@ Helper to create a SkeletalMeshComponent in UE4/5 at runtime.
 This is a UE4/5 plugin that simplify the process of creating a `USkeletalMeshComponent`, with many surfaces, at runtime.
 You can just pass all the surfaces' data, this library will take care to correctly populate the UE4/5 buffers, needed to have a fully working `USkeletalMeshComponent`.
 
-## This Fork fixes 5 major bugs in this plugin
+## This Fork fixes some major bugs in this plugin
 
 The original version of the plugin has an issue that causes it to completely trash the model being loaded into UE4/5, this bug is fixed here.
 And a second issue that cause animations to fail, this bug is fixed here.
+
+* Update to UE5
+
+* Update README.md
+
+* Fix Get Raw Bone Num RuntimeSkeletalMeshGenerator.cpp
+
+* Fix a bug related to the material
+
+* Fix Crash problems caused by INDEX_NONE
+
+  Fixed bug about bone weight, the default value should be 0, the array will be out of bounds, the functions inside ue are bug,
+
+  int32 InfluenceBone = Section.BoneMap [Vert.InfluenceBones [InfluenceIndex]]; 
+
+  the array is out of bounds, INDEX_NONE is -1, which causes an error. It needs to be set to 0.
 
 ## How to use it
 
