@@ -1,7 +1,7 @@
 # Runtime Skeletal Mesh Generator for UE5
 Helper to create a SkeletalMeshComponent in UE5 at runtime.
 
-This is a UE4 plugin that simplify the process of creating a `USkeletalMeshComponent`, with many surfaces, at runtime.
+This is a UE5 plugin that simplify the process of creating a `USkeletalMeshComponent`, with many surfaces, at runtime.
 You can just pass all the surfaces' data, this library will take care to correctly populate the UE5 buffers, needed to have a fully working `USkeletalMeshComponent`.
 
 ## How to use it
