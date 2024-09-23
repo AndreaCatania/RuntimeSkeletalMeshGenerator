@@ -1,5 +1,5 @@
 /******************************************************************************/
-/* SkeletalMeshComponent Generator for UE4.27                                 */
+/* SkeletalMeshComponent Generator for UE5.3                                 */
 /* -------------------------------------------------------------------------- */
 /* License MIT                                                                */
 /* Kindly sponsored by IMVU                                                   */
@@ -23,9 +23,15 @@
  */
 struct RUNTIMESKELETALMESHGENERATOR_API FRawBoneInfluence
 {
-	float Weight;
 	int32 VertexIndex;
 	int32 BoneIndex;
+	float Weight;
+
+	explicit FRawBoneInfluence(const int32 VertexIndex = -1, const int32 BoneIndex = -1, const float Weight = 0.):
+		VertexIndex(VertexIndex),
+		BoneIndex(BoneIndex),
+		Weight(Weight)
+	{}
 };
 
 /**
@@ -33,14 +39,15 @@ struct RUNTIMESKELETALMESHGENERATOR_API FRawBoneInfluence
  */
 struct RUNTIMESKELETALMESHGENERATOR_API FMeshSurface
 {
-	TArray<FVector> Vertices;
-	TArray<FVector> Tangents;
-	TArray<bool> FlipBinormalSigns;
-	TArray<FVector> Normals;
-	TArray<FColor> Colors;
-	TArray<TArray<FVector2D>> Uvs;
-	TArray<TArray<FRawBoneInfluence>> BoneInfluences;
-	TArray<uint32> Indices;
+	int32 MaterialIndex;
+	TArray<uint32> Indices{};
+	TArray<FVector> Vertices{};
+	TArray<FVector> Tangents{};
+	TArray<FVector> Normals{};
+	TArray<TArray<FVector2D>> Uvs{};
+	TArray<FColor> Colors{};
+	TArray<bool> FlipBinormalSigns{};
+	TArray<TArray<FRawBoneInfluence>> BoneInfluences{};
 };
 
 class FRuntimeSkeletalMeshGeneratorModule : public IModuleInterface
@@ -56,10 +63,11 @@ public: // ----------------------------------------------------------------- API
 	/**
 	 * Generate the `SkeletalMesh` for the given surfaces.
 	 */
-	static void GenerateSkeletalMesh(
+	static bool GenerateSkeletalMesh(
 		USkeletalMesh* SkeletalMesh,
 		const TArray<FMeshSurface>& Surfaces,
 		const TArray<UMaterialInterface*>& SurfacesMaterial,
+		const bool bNeedCPUAccess = false,
 		const TMap<FName, FTransform>& BoneTransformsOverride = TMap<FName, FTransform>());
 
 	/**
@@ -71,17 +79,19 @@ public: // ----------------------------------------------------------------- API
 		USkeleton* BaseSkeleton,
 		const TArray<FMeshSurface>& Surfaces,
 		const TArray<UMaterialInterface*>& SurfacesMaterial,
+		const bool bNeedCPUAccess = false,
 		const TMap<FName, FTransform>& BoneTransformsOverride = TMap<FName, FTransform>());
 
 	/**
 	 * Update an existing the `SkeletalMeshComponent` for the given surfaces
 	 * optionally supply the transform override
 	 */
-	static void UpdateSkeletalMeshComponent(
+	static bool UpdateSkeletalMeshComponent(
 		USkeletalMeshComponent* SkeletalMeshComponent,
 		USkeleton* BaseSkeleton,
 		const TArray<FMeshSurface>& Surfaces,
 		const TArray<UMaterialInterface*>& SurfacesMaterial,
+		const bool bNeedCPUAccess = false,
 		const TMap<FName, FTransform>& BoneTransformOverrides = TMap<FName, FTransform>());
 
 	/**
