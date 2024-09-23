@@ -14,11 +14,11 @@
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
 	"Installed": false,
-	"EnabledByDefault": true,
 	"Modules": [
 		{
 			"Name": "RuntimeSkeletalMeshGenerator",
-			"Type": "Runtime"
+			"Type": "Runtime",
+			"LoadingPhase": "PreEarlyLoadingScreen"
 		}
 	]
 }

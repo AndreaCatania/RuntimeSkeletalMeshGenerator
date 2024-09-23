@@ -1,5 +1,5 @@
-﻿/******************************************************************************/
-/* SkeletalMeshComponent Generator for UE5.03                                 */
+/******************************************************************************/
+/* SkeletalMeshComponent Generator for UE5.3                                 */
 /* -------------------------------------------------------------------------- */
 /* License MIT                                                                */
 /* Kindly sponsored by IMVU                                                   */
@@ -11,7 +11,9 @@
 /* `USkeletalMeshComponent`.                                                  */
 /******************************************************************************/
 #include "RuntimeSkeletalMeshGenerator.h"
-#include "Rendering/SkeletalMeshLODModel.h"
+
+#include "Engine/SkeletalMeshLODSettings.h"
+#include "Engine/SkinnedAssetCommon.h"
 #include "Rendering/SkeletalMeshModel.h"
 
 void FRuntimeSkeletalMeshGeneratorModule::StartupModule()
@@ -199,7 +201,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 			const int32 VertexIndex = Indices[WedgeIndex];
 
 			ImportedModelData.Wedges[WedgeIndex].VertexIndex = VertexIndex;
-			for (int32 UVIndex = 0; UVIndex < FMath::Min(MAX_TEXCOORDS, MAX_STATIC_TEXCOORDS); UVIndex += 1)
+			for (int32 UVIndex = 0; UVIndex < FMath::Min<int32>(MAX_TEXCOORDS, MAX_STATIC_TEXCOORDS); ++UVIndex)
 			{
 				ImportedModelData.Wedges[WedgeIndex].UVs[UVIndex] = StaticVertices[VertexIndex].UVs[UVIndex];
 			}
@@ -363,9 +365,8 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 				// Make sure these are the same.
 				check(v == VertInfluence.VertexIndex);
 
-				// Convert 0.0 - 1.0 range to 0 - 255
-				const uint8 EncodedWeight =
-					FMath::Clamp(VertInfluence.Weight, 0.f, 1.f) * 255.f;
+				// Convert 0.0 - 1.0 range to 0 - 65535
+				const uint16 EncodedWeight = FMath::Clamp(VertInfluence.Weight, 0., 1.) * 65535.;
 
 				MeshSection.SoftVertices[v].InfluenceWeights[InfluenceIndex] = EncodedWeight;
 				MeshSection.SoftVertices[v].InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? 0 : VertInfluence.BoneIndex;
@@ -484,9 +485,8 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 						continue;
 					}
 
-					// Convert 0.0 - 1.0 range to 0 - 255
-					const uint8 EncodedWeight =
-						FMath::Clamp(VertInfluence.Weight, 0.f, 1.f) * 255.f;
+					// Convert 0.0 - 1.0 range to 0 - 65535
+					const uint16 EncodedWeight = FMath::Clamp(VertInfluence.Weight, 0., 1.) * 65535;
 					Weight.InfluenceWeights[InfluenceIndex] = EncodedWeight;
 					Weight.InfluenceBones[InfluenceIndex] = EncodedWeight == 0 ? 0 : VertInfluence.BoneIndex;
 
@@ -494,7 +494,7 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 					if (Weight.InfluenceBones[InfluenceIndex] != INDEX_NONE)
 					{
 						SkeletalMeshImportData::FRawBoneInfluence& Influence = ImportedModelData.Influences.AddDefaulted_GetRef();
-						Influence.Weight = FMath::Clamp(static_cast<float>(Weight.InfluenceWeights[InfluenceIndex]) / 255.0, 0.0, 1.0);
+						Influence.Weight = static_cast<float>(FMath::Clamp(Weight.InfluenceWeights[InfluenceIndex] / 65535.0, 0.0, 1.0));
 						Influence.BoneIndex = Weight.InfluenceBones[InfluenceIndex];
 						Influence.VertexIndex = VertexIndex;
 					}
@@ -550,15 +550,13 @@ bool FRuntimeSkeletalMeshGenerator::GenerateSkeletalMesh(
 	LODMeshRenderData->SkinWeightVertexBuffer = Weights;
 
 	// Set the default Material.
-	for (auto Material : SurfacesMaterial)
+	SkeletalMesh->GetMaterials().Reserve(SurfacesMaterial.Num());
+	for (auto& Material : SurfacesMaterial)
 	{
-		SkeletalMesh->GetMaterials().Add(Material);
+		SkeletalMesh->GetMaterials().Emplace(Material);
 	}
 
 	// Rebuild inverse ref pose matrices.
-	SkeletalMesh->SkelMirrorTable.Empty();
-	SkeletalMesh->SkelMirrorAxis = EAxis::Type::None;
-	SkeletalMesh->SkelMirrorFlipAxis = EAxis::Type::None;
 	SkeletalMesh->GetRefBasesInvMatrix().Empty();
 	SkeletalMesh->CalculateInvRefMatrices(); 
 	MeshRenderData->bReadyForStreaming = false;
@@ -805,7 +803,7 @@ bool FRuntimeSkeletalMeshGenerator::DecomposeSkeletalMesh(
 				Surface.BoneInfluences[i][BoneInfluenceIndex].BoneIndex =
 					RenderSection.BoneMap[RenderData.SkinWeightVertexBuffer.GetBoneIndex(VertexIndex, BoneInfluenceIndex)];
 				Surface.BoneInfluences[i][BoneInfluenceIndex].Weight =
-					FMath::Clamp(static_cast<float>(RenderData.SkinWeightVertexBuffer.GetBoneWeight(VertexIndex, BoneInfluenceIndex)) / 255.0, 0.0, 1.0);
+					static_cast<float>(FMath::Clamp(RenderData.SkinWeightVertexBuffer.GetBoneWeight(VertexIndex, BoneInfluenceIndex) / 65535.0, 0.0, 1.0));
 			}
 		}
 
@@ -825,9 +823,9 @@ bool FRuntimeSkeletalMeshGenerator::DecomposeSkeletalMesh(
 	}
 
 	OutSurfacesMaterial.Reserve(SkeletalMesh->GetMaterials().Num());
-	for (const FSkeletalMaterial& Material : SkeletalMesh->GetMaterials())
+	for (const auto& Material : SkeletalMesh->GetMaterials())
 	{
-		OutSurfacesMaterial.Add(Material.MaterialInterface);
+		OutSurfacesMaterial.Emplace(Material.MaterialInterface);
 	}
 
 	return true;
